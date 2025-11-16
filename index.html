@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음절 네모 변환기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Malgun Gothic', sans-serif;
+        }
+        /* 사용자가 클릭해서 선택한 단어에 적용될 스타일 */
+        .word.selected {
+            background-color: #fef08a; /* Tailwind yellow-200 */
+            color: #713f12; /* Tailwind amber-800 */
+            border-radius: 4px;
+        }
+        /* 단어에 마우스를 올렸을 때의 부드러운 전환 효과 */
+        .word {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+        /* textarea의 줄바꿈과 공백이 선택/결과 영역에 그대로 보이도록 설정 */
+        #selectable-area, #result-area, #answers-area {
+            white-space: pre-wrap;
+        }
+        /* 네모 문자 스타일: 화면에서 더 크게 보이도록 조정 */
+        .box-char {
+            font-size: 1.8em; /* 주변 텍스트의 1.8배 크기 */
+            vertical-align: -0.3em; /* 다른 글자와 세로 정렬 미세 조정 */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen py-10">
+
+    <div class="bg-white w-full max-w-2xl mx-4 p-6 sm:p-8 rounded-xl shadow-lg">
+        
+        <!-- 앱 제목 -->
+        <header class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">음절 네모 변환기</h1>
+            <p class="text-slate-500 mt-2">문장을 입력하고, 네모로 바꿀 단어를 클릭하세요.</p>
+        </header>
+
+        <main>
+            <!-- 1. 상단: 문장 입력 -->
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sentence-input" class="block text-sm font-medium text-slate-700">1. 문장 입력</label>
+                    <div class="flex space-x-2">
+                        <button id="delete-content-btn" class="bg-gray-200 text-gray-700 font-semibold py-1 px-3 rounded-lg hover:bg-gray-300 transition text-xs shadow-sm">입력 내용 삭제</button>
+                        <button id="clean-newlines-btn" class="bg-red-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-red-600 transition text-xs shadow-sm">빈 줄 삭제</button>
+                    </div>
+                </div>
+                <textarea id="sentence-input" rows="4" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="여기에 변환할 문장을 입력하세요..."></textarea>
+            </div>
+            
+            <!-- 버튼 1 -->
+            <div class="mb-6">
+                <button id="prepare-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 transition shadow-sm">□로 바꿀 단어 선택하기</button>
+            </div>
+
+            <!-- 단어 선택 영역 -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-1">2. □로 변경할 단어 클릭<span class="text-blue-600 font-normal"> (노란색 부분 □로 변환, 특수문자는 변경 안됨)</span></label>
+                <div id="selectable-area" class="w-full h-36 overflow-y-auto p-4 bg-slate-50 border border-dashed border-slate-300 rounded-lg text-left leading-loose">
+                </div>
+            </div>
+
+            <!-- 버튼 2 -->
+             <div class="mb-6">
+                <button id="convert-btn" class="w-full bg-slate-700 text-white font-semibold py-3 px-4 rounded-lg hover:bg-slate-800 transition shadow-sm">□로 변경하기</button>
+            </div>
+
+            <!-- 3. 변경된 문장 -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                     <label class="block text-sm font-medium text-slate-700">3. □로 변경된 문장 <span class="text-red-500 font-semibold">(붙여넣을 때 '원본 형식 유지' 선택)</span></label>
+                     <button id="copy-btn" class="bg-green-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-green-700 transition text-sm shadow-sm">복사하기</button>
+                </div>
+                <div id="result-area" class="w-full h-36 overflow-y-auto p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 word-break-keep-all text-lg">
+                </div>
+            </div>
+
+            <!-- 4. 정답 모음 -->
+            <div class="mt-6">
+                <div class="flex justify-between items-center mb-1">
+                     <label class="block text-sm font-medium text-slate-700"><정답> <span class="text-sm text-slate-500"></span></label>
+                     <button id="copy-answers-btn" class="bg-green-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-green-700 transition text-sm shadow-sm">복사하기</button>
+                </div>
+                <div id="answers-area" class="w-full min-h-[100px] p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 word-break-keep-all text-lg">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // HTML 요소를 변수로 가져오기
+        const sentenceInput = document.getElementById('sentence-input');
+        const prepareBtn = document.getElementById('prepare-btn');
+        const convertBtn = document.getElementById('convert-btn');
+        const selectableArea = document.getElementById('selectable-area');
+        const resultArea = document.getElementById('result-area');
+        const copyBtn = document.getElementById('copy-btn');
+        const cleanNewlinesBtn = document.getElementById('clean-newlines-btn');
+        const deleteContentBtn = document.getElementById('delete-content-btn');
+        const answersArea = document.getElementById('answers-area');
+        const copyAnswersBtn = document.getElementById('copy-answers-btn');
+
+        // '입력 내용 삭제' 버튼 클릭 시 실행될 함수
+        deleteContentBtn.addEventListener('click', () => {
+            sentenceInput.value = '';
+            selectableArea.innerHTML = '';
+            resultArea.textContent = '';
+            answersArea.textContent = '';
+        });
+
+        // '빈 줄 삭제' 버튼 클릭 시 실행될 함수
+        cleanNewlinesBtn.addEventListener('click', () => {
+            const text = sentenceInput.value;
+            const lines = text.split(/\r\n|\r|\n/);
+            const contentLines = lines.filter(line => /[가-힣a-zA-Z0-9]/.test(line));
+            const newText = contentLines.join('\n');
+            sentenceInput.value = newText;
+        });
+
+        // '□로 바꿀 단어 선택하기' 버튼 클릭 시 실행될 함수
+        prepareBtn.addEventListener('click', () => {
+            const sentence = sentenceInput.value;
+            if (sentence.trim() === '') {
+                resultArea.textContent = '먼저 문장을 입력해주세요.';
+                resultArea.classList.add('text-red-500');
+                return;
+            }
+            resultArea.textContent = '';
+            answersArea.textContent = '';
+            resultArea.classList.remove('text-red-500');
+            selectableArea.innerHTML = '';
+            
+            const currentSentence = sentenceInput.value;
+            // 한글, 영어, 숫자, 기호, 공백 그룹으로 나누는 정규식
+            const parts = currentSentence.match(/([가-힣]+)|([a-zA-Z]+)|([0-9]+)|([^\s가-힣a-zA-Z0-9]+)|(\s+)/g) || [];
+
+            // 자주 쓰이는 조사 목록 (길이가 긴 것부터 순서대로 정렬)
+            const josas = [
+                '으로부터', '에서부터', '에게서는', '이야말로',
+                '에서는', '에게는', '에서만', '에게도', '이라는', '이라고', '만큼은', '마저도', '이랑',
+                '에는', '에서', '에게', '부터', '까지', '처럼', '하고', '보다', '마저', '조차', '으로', '이란',
+                '은', '는', '이', '가', '을', '를', '의', '에', '와', '과', '도', '만', '께', '로', '야'
+            ];
+
+            // 클릭 가능한 span 요소를 만드는 헬퍼 함수
+            const createClickableSpan = (text) => {
+                if(!text) return; // 빈 텍스트는 span을 만들지 않음
+                const wordSpan = document.createElement('span');
+                wordSpan.textContent = text;
+                wordSpan.className = 'word cursor-pointer p-1';
+                wordSpan.addEventListener('click', () => {
+                    wordSpan.classList.toggle('selected');
+                });
+                selectableArea.appendChild(wordSpan);
+            };
+
+            parts.forEach(part => {
+                if (/^\s+$/.test(part)) {
+                    // 공백인 경우, 그대로 텍스트 노드로 추가
+                    selectableArea.appendChild(document.createTextNode(part));
+                } else if (/[가-힣]/.test(part) && part.length > 1) {
+                    // 한글인 경우, 조사를 분리하는 로직 적용
+                    let word = part;
+                    let foundJosa = '';
+                    let stem = '';
+
+                    // 가장 긴 조사를 먼저 찾기 위해 정렬된 리스트를 순회
+                    for (const josa of josas) {
+                        if (word.endsWith(josa) && word.length > josa.length) {
+                            stem = word.slice(0, -josa.length);
+                            foundJosa = josa;
+                            break; // 가장 긴 조사를 찾았으면 반복 중단
+                        }
+                    }
+
+                    if (foundJosa) {
+                        createClickableSpan(stem);
+                        createClickableSpan(foundJosa);
+                    } else {
+                        createClickableSpan(part);
+                    }
+                } else {
+                    // 그 외 (영어, 숫자, 기호)는 그대로 span으로 만듦
+                    createClickableSpan(part);
+                }
+            });
+        });
+
+        // '□로 변경하기' 버튼 클릭 시 실행될 함수
+        convertBtn.addEventListener('click', () => {
+            const nodes = selectableArea.childNodes;
+            
+            if (nodes.length === 0 || selectableArea.querySelector('.word') === null) {
+                resultArea.textContent = "먼저 '□로 바꿀 단어 선택하기'를 실행해주세요.";
+                resultArea.classList.add('text-red-500');
+                return;
+            }
+            resultArea.innerHTML = '';
+            answersArea.innerHTML = '';
+            resultArea.classList.remove('text-red-500');
+
+            let finalHtml = '';
+            let boxCounter = 0;
+            let previousNodeWasSelected = false;
+            let currentAnswerPart = '';
+            let collectedAnswers = [];
+
+            nodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('word')) {
+                    if (node.classList.contains('selected')) {
+                        currentAnswerPart += node.textContent; // 정답 조각 모으기
+                        if (!previousNodeWasSelected) {
+                            const numberSymbol = String.fromCharCode(0x2460 + boxCounter);
+                            finalHtml += numberSymbol;
+                            boxCounter++;
+                        }
+                        
+                        const originalWord = node.textContent;
+                        const convertedWordHtml = originalWord.split('').map(char => {
+                            const isWordChar = /[가-힣a-zA-Z0-9]/.test(char);
+                            return isWordChar ? `<span class="box-char">□</span>` : char;
+                        }).join('');
+                        finalHtml += convertedWordHtml;
+                        previousNodeWasSelected = true;
+                    } else {
+                        if (currentAnswerPart) {
+                            collectedAnswers.push(currentAnswerPart);
+                            currentAnswerPart = '';
+                        }
+                        finalHtml += node.textContent;
+                        previousNodeWasSelected = false;
+                    }
+                } else {
+                    if (currentAnswerPart) {
+                        collectedAnswers.push(currentAnswerPart);
+                        currentAnswerPart = '';
+                    }
+                    finalHtml += node.textContent;
+                    previousNodeWasSelected = false;
+                }
+            });
+
+            if (currentAnswerPart) {
+                collectedAnswers.push(currentAnswerPart);
+            }
+
+            resultArea.innerHTML = finalHtml;
+
+            // 정답 목록 표시
+            let answersText = '';
+            collectedAnswers.forEach((answer, index) => {
+                const numberSymbol = String.fromCharCode(0x2460 + index);
+                answersText += `${numberSymbol} ${answer}\n`;
+            });
+            answersArea.textContent = answersText.trim();
+        });
+
+        // '복사하기' 버튼 클릭 시 실행될 함수
+        copyBtn.addEventListener('click', () => {
+            if (!resultArea.textContent) return;
+
+            const showSuccessFeedback = (button) => {
+                const originalText = button.textContent;
+                button.textContent = '복사 완료!';
+                button.disabled = true;
+                button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                button.classList.add('bg-indigo-600');
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                    button.classList.remove('bg-indigo-600');
+                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                }, 2000);
+            };
+            
+            let styledHtml = '';
+            const lines = resultArea.innerHTML.split('\n');
+            lines.forEach(line => {
+                let lineHtml = `<p style="margin: 0; padding: 0; font-size: 10pt; font-family: 'Malgun Gothic', sans-serif; background-color: white;">`;
+                lineHtml += line.replace(/<span class="box-char">□<\/span>/g, '<span style="font-size: 20pt; background-color: white;">□</span>');
+                lineHtml += `</p>`;
+                styledHtml += lineHtml;
+            });
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.contentEditable = 'true';
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.innerHTML = styledHtml;
+            document.body.appendChild(tempDiv);
+            
+            const range = document.createRange();
+            range.selectNodeContents(tempDiv);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.error('서식 복사 명령 실행 중 오류:', err);
+            }
+
+            selection.removeAllRanges();
+            document.body.removeChild(tempDiv);
+
+            if (success) {
+                showSuccessFeedback(copyBtn);
+            } else {
+                const textToCopy = resultArea.textContent;
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "absolute";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    if (document.execCommand('copy')) {
+                        showSuccessFeedback(copyBtn);
+                    }
+                } catch (err) {
+                    console.error('대체 텍스트 복사 실패:', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+
+        // '정답 복사' 버튼 클릭 이벤트
+        copyAnswersBtn.addEventListener('click', () => {
+            const textToCopy = answersArea.textContent;
+            if (!textToCopy) return;
+
+             const showSuccessFeedback = (button) => {
+                const originalText = button.textContent;
+                button.textContent = '복사 완료!';
+                button.disabled = true;
+                button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                button.classList.add('bg-indigo-600');
+                setTimeout(() => {
+                    button.textContent = '복사하기';
+                    button.disabled = false;
+                    button.classList.remove('bg-indigo-600');
+                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                }, 2000);
+            };
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showSuccessFeedback(copyAnswersBtn);
+            }).catch(err => {
+                console.warn('클립보드 API 실패, 대체 방법 사용:', err);
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "absolute";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    if (document.execCommand('copy')) {
+                        showSuccessFeedback(copyAnswersBtn);
+                    }
+                } catch (err) {
+                    console.error('대체 텍스트 복사 실패:', err);
+                }
+                document.body.removeChild(textArea);
+            });
+        });
+
+    </script>
+
+</body>
+</html>
+
