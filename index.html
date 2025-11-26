@@ -28,6 +28,8 @@
         .box-char {
             font-size: 1.8em; /* 주변 텍스트의 1.8배 크기 */
             vertical-align: -0.3em; /* 다른 글자와 세로 정렬 미세 조정 */
+            line-height: 1;
+            display: inline-block;
         }
     </style>
 </head>
@@ -74,8 +76,14 @@
             <!-- 3. 변경된 문장 -->
             <div>
                 <div class="flex justify-between items-center mb-1">
-                     <label class="block text-sm font-medium text-slate-700">3. □로 변경된 문장 <span class="text-red-500 font-semibold">(붙여넣을 때 '원본 형식 유지' 선택)</span></label>
-                     <button id="copy-btn" class="bg-green-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-green-700 transition text-sm shadow-sm">복사하기</button>
+                     <label class="block text-sm font-medium text-slate-700">3. □로 변경된 문장 <span class="text-red-500 font-semibold text-xs sm:text-sm">(붙여넣을 때 '원본 형식 유지' 선택)</span></label>
+                     <div class="flex items-center space-x-2">
+                        <div class="flex items-center">
+                            <input id="add-name-checkbox" type="checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" checked>
+                            <label for="add-name-checkbox" class="ml-2 text-sm font-medium text-slate-700">이름추가</label>
+                        </div>
+                        <button id="copy-btn" class="bg-green-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-green-700 transition text-sm shadow-sm">복사하기</button>
+                    </div>
                 </div>
                 <div id="result-area" class="w-full h-36 overflow-y-auto p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 word-break-keep-all text-lg">
                 </div>
@@ -84,7 +92,7 @@
             <!-- 4. 정답 모음 -->
             <div class="mt-6">
                 <div class="flex justify-between items-center mb-1">
-                     <label class="block text-sm font-medium text-slate-700"><정답> <span class="text-sm text-slate-500"></span></label>
+                     <label class="block text-sm font-medium text-slate-700">&lt;정답&gt; <span class="text-sm text-slate-500"></span></label>
                      <button id="copy-answers-btn" class="bg-green-600 text-white font-semibold py-1.5 px-4 rounded-lg hover:bg-green-700 transition text-sm shadow-sm">복사하기</button>
                 </div>
                 <div id="answers-area" class="w-full min-h-[100px] p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 word-break-keep-all text-lg">
@@ -105,6 +113,7 @@
         const deleteContentBtn = document.getElementById('delete-content-btn');
         const answersArea = document.getElementById('answers-area');
         const copyAnswersBtn = document.getElementById('copy-answers-btn');
+        const addNameCheckbox = document.getElementById('add-name-checkbox');
 
         // '입력 내용 삭제' 버튼 클릭 시 실행될 함수
         deleteContentBtn.addEventListener('click', () => {
@@ -288,6 +297,22 @@
                 styledHtml += lineHtml;
             });
             
+            // 체크박스 상태에 따라 HTML 수정
+            if (addNameCheckbox.checked) {
+                // 수정된 헤더 HTML: 학번 밑줄 길이를 늘려서 이름 입력란과 비슷한 길이로 조정
+                const headerHtml = `<p style="margin: 0; padding: 0; font-size: 10pt; font-family: 'Malgun Gothic', sans-serif; background-color: white; text-align: left; margin-bottom: 10px;">(학번: ____________________ )&nbsp;&nbsp;(이름: ____________________ )</p>`;
+                styledHtml = `
+                    <table style="border-collapse: collapse; width: 100%;">
+                        <tr>
+                            <td style="border: 1px solid black; padding: 10px;">
+                                ${headerHtml}
+                                ${styledHtml}
+                            </td>
+                        </tr>
+                    </table>
+                `;
+            }
+
             const tempDiv = document.createElement('div');
             tempDiv.contentEditable = 'true';
             tempDiv.style.position = 'absolute';
@@ -314,21 +339,13 @@
             if (success) {
                 showSuccessFeedback(copyBtn);
             } else {
+                // Fallback for environments where execCommand fails inside iframes
                 const textToCopy = resultArea.textContent;
-                const textArea = document.createElement("textarea");
-                textArea.value = textToCopy;
-                textArea.style.position = "absolute";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    if (document.execCommand('copy')) {
-                        showSuccessFeedback(copyBtn);
-                    }
-                } catch (err) {
-                    console.error('대체 텍스트 복사 실패:', err);
-                }
-                document.body.removeChild(textArea);
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                     showSuccessFeedback(copyBtn);
+                }).catch(err => {
+                    console.error('모든 복사 방법 실패:', err);
+                });
             }
         });
 
@@ -351,24 +368,31 @@
                 }, 2000);
             };
 
+            // 우선 execCommand 시도 (iframe 호환성 위해)
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            textArea.style.position = "absolute";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {
+                const success = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (success) {
+                    showSuccessFeedback(copyAnswersBtn);
+                    return;
+                }
+            } catch (err) {
+                document.body.removeChild(textArea);
+                console.warn('execCommand 실패, clipboard API 시도:', err);
+            }
+
+            // 실패시 clipboard API 사용
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showSuccessFeedback(copyAnswersBtn);
             }).catch(err => {
-                console.warn('클립보드 API 실패, 대체 방법 사용:', err);
-                const textArea = document.createElement("textarea");
-                textArea.value = textToCopy;
-                textArea.style.position = "absolute";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    if (document.execCommand('copy')) {
-                        showSuccessFeedback(copyAnswersBtn);
-                    }
-                } catch (err) {
-                    console.error('대체 텍스트 복사 실패:', err);
-                }
-                document.body.removeChild(textArea);
+                console.error('복사 실패:', err);
             });
         });
 
@@ -376,4 +400,3 @@
 
 </body>
 </html>
-
