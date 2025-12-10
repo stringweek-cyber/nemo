@@ -51,6 +51,8 @@
                     <div class="flex space-x-2">
                         <button id="delete-content-btn" class="bg-gray-200 text-gray-700 font-semibold py-1 px-3 rounded-lg hover:bg-gray-300 transition text-xs shadow-sm">입력 내용 삭제</button>
                         <button id="clean-newlines-btn" class="bg-red-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-red-600 transition text-xs shadow-sm">빈 줄 삭제</button>
+                        <!-- 샘플글 버튼 추가됨 -->
+                        <button id="sample-text-btn" class="bg-green-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-green-600 transition text-xs shadow-sm">샘플글</button>
                     </div>
                 </div>
                 <textarea id="sentence-input" rows="4" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="여기에 변환할 문장을 입력하세요..."></textarea>
@@ -111,9 +113,23 @@
         const copyBtn = document.getElementById('copy-btn');
         const cleanNewlinesBtn = document.getElementById('clean-newlines-btn');
         const deleteContentBtn = document.getElementById('delete-content-btn');
+        const sampleTextBtn = document.getElementById('sample-text-btn'); // 샘플글 버튼 추가
         const answersArea = document.getElementById('answers-area');
         const copyAnswersBtn = document.getElementById('copy-answers-btn');
         const addNameCheckbox = document.getElementById('add-name-checkbox');
+
+        // 샘플 텍스트 정의 (수정됨)
+        const sampleText = `기체반응의 법칙\n1808년 게이뤼삭(Gay-Lussac)은 ‘온도와 압력이 일정할 때, 반응하는 기체와 생성되는 기체의 부피 사이에는 일정한 정수비가 성립한다’고 했다.`;
+
+        // '샘플글' 버튼 클릭 시 실행될 함수
+        sampleTextBtn.addEventListener('click', () => {
+            sentenceInput.value = sampleText;
+            // 기존 결과물 초기화 (혼동 방지)
+            selectableArea.innerHTML = '';
+            resultArea.textContent = '';
+            answersArea.textContent = '';
+            resultArea.classList.remove('text-red-500');
+        });
 
         // '입력 내용 삭제' 버튼 클릭 시 실행될 함수
         deleteContentBtn.addEventListener('click', () => {
